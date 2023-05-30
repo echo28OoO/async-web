@@ -2,8 +2,11 @@ use std::fs;
 use std::io::prelude::*;
 use std::net::TcpListener;
 use std::net::TcpStream;
+use async_std::task;
+use std::time::Duration;
 
-fn main() {
+#[async_std::main]
+async fn main() {
     // 监听本地端口 7878 ，等待 TCP 连接的建立
     let listener = TcpListener::bind("127.0.0.1:7878").unwrap();
 
@@ -11,20 +14,23 @@ fn main() {
     for stream in listener.incoming() {
         let stream = stream.unwrap();
 
-        handle_connection(stream);
+        handle_connection(stream).await;
     }
 }
 
-fn handle_connection(mut stream: TcpStream) {
+async fn handle_connection(mut stream: TcpStream) {
     // 从连接中顺序读取 1024 字节数据
     let mut buffer = [0; 1024];
     stream.read(&mut buffer).unwrap();
 
     let get = b"GET / HTTP/1.1\r\n";
-
+    let sleep = b"GET /sleep HTTP/1.1\r\n";
 
     // 处理HTTP协议头，若不符合则返回404和对应的 `html` 文件
     let (status_line, filename) = if buffer.starts_with(get) {
+        ("HTTP/1.1 200 OK\r\n\r\n", "hello.html")
+    } else if buffer.starts_with(sleep) {
+        task::sleep(Duration::from_secs(5)).await;
         ("HTTP/1.1 200 OK\r\n\r\n", "hello.html")
     } else {
         ("HTTP/1.1 404 NOT FOUND\r\n\r\n", "404.html")
